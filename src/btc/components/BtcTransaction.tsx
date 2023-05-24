@@ -1,62 +1,44 @@
-import React, { useState } from 'react';
+import axios from 'axios';
+import React, { useRef, useState } from 'react';
+import { BlockcypherTransaction } from '../../models/blockchain';
 import UiButton from '../../ui-components/UiButton';
 import { UiDescriptionList } from '../../ui-components/UiDescriptionList';
 import { UiInputField } from '../../ui-components/UiInputField';
 
-export interface BlockcypherTransaction {
-  block_hash: string;
-  block_height: number;
-  block_index: number;
-  hash: string;
-  addresses: string[];
-  total: number;
-  fees: number;
-  size: number;
-  vsize: number;
-  preference: string;
-  confirmed: string;
-  received: string;
-  ver: number;
-  double_spend: boolean;
-  vin_sz: number;
-  vout_sz: number;
-  confirmations: number;
-  confidence: number;
-  inputs: {
-    prev_hash: string;
-    output_index: number;
-    output_value: number;
-    sequence: number;
-    addresses: string[];
-    script_type: string;
-    age: number;
-    witness?: string[];
-  }[];
-  outputs: {
-    value: number;
-    script: string;
-    spent_by?: string;
-    addresses?: string[];
-    script_type?: string;
-  }[];
-}
-
 function BtcTransaction() {
-  const [searchTransaction, setSearchTransaction] = useState('');
+  const [searchTransaction, setSearchTransaction] = useState<string>('');
   const [txData, setTxData] = useState<BlockcypherTransaction | null>(null);
 
-  const handleSearch = async () => {
-    const response = await fetch(
-      `http://localhost:3000/blockchain/transactions/${searchTransaction}`
-    );
-    const data = await response.json();
+  // Here useRef comes handy for keeping any mutable value around
+  const lastSearchedTxRef = useRef<string>('');
 
-    setTxData(data);
+  const handleSearch = async () => {
+    if (searchTransaction === lastSearchedTxRef?.current) {
+      return;
+    }
+    try {
+      const response = await axios.get<BlockcypherTransaction>(
+        `http://localhost:3000/blockchain/transactions/${searchTransaction}`
+      );
+      if (response.status === 400) {
+        throw new Error('Bad request.');
+      }
+      if (response.status === 500) {
+        throw new Error('Internal server error');
+      }
+      const data: BlockcypherTransaction = await response.data;
+
+      setTxData(data);
+      lastSearchedTxRef.current = searchTransaction;
+    } catch (error) {
+      console.error(error);
+      alert('Address search failed: ' + (error as Error).message);
+    }
   };
 
   const addressInputLabel = 'Search Address:';
 
-  const txAmount = txData?.outputs.reduce(
+  const txAmount = txData?.outputs?.reduce(
     (total, output) => total + output.value,
     0
   );

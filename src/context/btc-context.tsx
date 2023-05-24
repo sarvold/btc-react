@@ -1,6 +1,6 @@
 import React, { createContext, PropsWithChildren, useState } from "react";
 
-interface BtcAddressListContextType {
+export interface BtcAddressListContextType {
   addresses: string[] | null;
   populateAddresses: (_addresses: string[]) => void; // React.Dispatch<React.SetStateAction<string[] | null>>;
 }

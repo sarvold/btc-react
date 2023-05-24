@@ -1,56 +1,42 @@
+import axios from 'axios';
 import React, { useRef, useState } from 'react';
+import { BlockcypherAddress } from '../../models/blockchain';
 import UiButton from '../../ui-components/UiButton';
 import { UiDescriptionList } from '../../ui-components/UiDescriptionList';
 import { UiInputField } from '../../ui-components/UiInputField';
 import { UiSectionHeader } from '../../ui-components/UiSectionHeader';
-import { BlockcypherTransaction } from './BtcTransaction';
-
-export interface BlockcypherAddress {
-  address: string;
-  total_received: number;
-  total_sent: number;
-  balance: number;
-  unconfirmed_balance: number;
-  final_balance: number;
-  n_tx: number;
-  unconfirmed_n_tx: number;
-  final_n_tx: number;
-  txrefs: TxRef[];
-  tx_url: string;
-}
-interface TxRef {
-  block_height: number;
-  confirmations: number;
-  confirmed: string;
-  double_spend: boolean;
-  ref_balance: number;
-  spent: boolean;
-  tx_hash: string;
-  tx_input_n: number;
-  tx_output_n: number;
-  value: number;
-}
 
 function BtcAddress() {
   const [searchAddress, setSearchAddress] = useState('');
   const [addressData, setAddressData] = useState<BlockcypherAddress | null>(
     null
   );
+
+  // Here useRef comes handy for keeping any mutable value around
   const lastSearchedAddressRef = useRef<string>('');
 
   const handleSearch = async () => {
     if (searchAddress === lastSearchedAddressRef?.current) {
-      console.log('Address already searched. Skipping API call.');
       return;
     }
-    console.log('Searching for address ', searchAddress);
-    const response = await fetch(
-      `http://localhost:3000/blockchain/addresses/${searchAddress}`
-    );
-    const data = await response.json();
+    try {
+      const response = await axios.get<BlockcypherAddress>(
+        `http://localhost:3000/blockchain/addresses/${searchAddress}`
+      );
+      if (response.status === 400) {
+        throw new Error('Bad request.');
+      }
+      if (response.status === 500) {
+        throw new Error('Internal server error');
+      }
+      const data: BlockcypherAddress = await response.data;
 
-    setAddressData(data);
-    lastSearchedAddressRef.current = searchAddress;
+      setAddressData(data);
+      lastSearchedAddressRef.current = searchAddress;
+    } catch (error) {
+      console.error(error);
+      alert('Address search failed: ' + (error as Error).message);
+    }
   };
 
   const addressItems = [
@@ -59,7 +45,10 @@ function BtcAddress() {
     { term: 'Final Balance', description: `${addressData?.final_balance}` },
   ];
   const txItems = addressData?.txrefs?.map((tx) => {
-    return { term: `Hash "${tx.tx_hash}"`, description: `${tx.value} Satoshi. Balance: ${tx.ref_balance}` };
+    return {
+      term: `Hash "${tx.tx_hash}"`,
+      description: `${tx.value} Satoshi. Balance: ${tx.ref_balance}`,
+    };
   });
 
   return (
