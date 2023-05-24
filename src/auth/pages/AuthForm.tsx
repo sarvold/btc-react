@@ -26,11 +26,8 @@ const AuthForm: React.FC = () => {
 
     setIsLoading(true);
 
-    const url =
-      "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=AIzaSyD8izZExkkQzHEuVfx6v2MwDFNAsj9_jeQ";
-    // TODO: use this instead const url = process.env.FIREBASE_URI;
-    // Test only: Firebase API_KEY = AIzaSyD8izZExkkQzHEuVfx6v2MwDFNAsj9_jeQ
-    // Test only: on firebase, email: test@test.com; pass: test1234
+    const apiKey = process.env.REACT_APP_FIREBASE_API_KEY;
+    const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`;
 
     // TODO: specify return type
     const res = await fetch(url, {
