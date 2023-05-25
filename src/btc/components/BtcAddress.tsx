@@ -1,8 +1,15 @@
 import axios from 'axios';
 import React, { useRef, useState } from 'react';
 import { BlockcypherAddress } from '../../models/blockchain';
+import {
+  isMappedErrorStatus,
+  MAPPED_ERROR_MESSAGES,
+} from '../../shared/components/Errors';
 import UiButton from '../../ui-components/UiButton';
 import { UiDescriptionList } from '../../ui-components/UiDescriptionList';
+import UiErrorModal, {
+  ErrorModalProps,
+} from '../../ui-components/UiErrorModal';
 import { UiInputField } from '../../ui-components/UiInputField';
 import { UiSectionHeader } from '../../ui-components/UiSectionHeader';
 
@@ -11,6 +18,10 @@ function BtcAddress() {
   const [addressData, setAddressData] = useState<BlockcypherAddress | null>(
     null
   );
+  const [error, setError] = useState<Omit<
+    ErrorModalProps,
+    'onConfirm'
+  > | null>();
 
   // Here useRef comes handy for keeping any mutable value around
   const lastSearchedAddressRef = useRef<string>('');
@@ -23,19 +34,22 @@ function BtcAddress() {
       const response = await axios.get<BlockcypherAddress>(
         `http://localhost:3000/blockchain/addresses/${searchAddress}`
       );
-      if (response.status === 400) {
-        throw new Error('Bad request.');
-      }
-      if (response.status === 500) {
-        throw new Error('Internal server error');
-      }
       const data: BlockcypherAddress = await response.data;
 
       setAddressData(data);
       lastSearchedAddressRef.current = searchAddress;
-    } catch (error) {
-      console.error(error);
-      alert('Address search failed: ' + (error as Error).message);
+    } catch (err) {
+      console.error(err);
+      setError({
+        title: (axios.isAxiosError(err) && err.response?.statusText) || 'Error',
+        message:
+          axios.isAxiosError(err) && isMappedErrorStatus(err?.response?.status)
+            ? MAPPED_ERROR_MESSAGES[err!.response!.status].message({
+                hashFrom: 'address',
+                hash: searchAddress,
+              })
+            : 'Something went wrong, try again.',
+      });
     }
   };
 
@@ -51,8 +65,18 @@ function BtcAddress() {
     };
   });
 
+  const errorHandler = () => {
+    setError(null);
+  };
   return (
     <>
+      {error && (
+        <UiErrorModal
+          onConfirm={errorHandler}
+          title={error.title}
+          message={error.message}
+        />
+      )}
       <UiSectionHeader text="Address Information" />
       <UiInputField
         label="Search Address:"
@@ -60,7 +84,7 @@ function BtcAddress() {
         value={searchAddress}
         onChange={(e) => setSearchAddress(e.target.value)}
       />
-      <UiButton text="Search" onClick={handleSearch} />
+      <UiButton onClick={handleSearch}>Search</UiButton>
       {addressData && (
         <>
           <UiDescriptionList items={addressItems} />

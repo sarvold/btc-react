@@ -1,13 +1,24 @@
 import axios from 'axios';
 import React, { useRef, useState } from 'react';
 import { BlockcypherTransaction } from '../../models/blockchain';
+import {
+  isMappedErrorStatus,
+  MAPPED_ERROR_MESSAGES,
+} from '../../shared/components/Errors';
 import UiButton from '../../ui-components/UiButton';
 import { UiDescriptionList } from '../../ui-components/UiDescriptionList';
+import UiErrorModal, {
+  ErrorModalProps,
+} from '../../ui-components/UiErrorModal';
 import { UiInputField } from '../../ui-components/UiInputField';
 
 function BtcTransaction() {
   const [searchTransaction, setSearchTransaction] = useState<string>('');
   const [txData, setTxData] = useState<BlockcypherTransaction | null>(null);
+  const [error, setError] = useState<Omit<
+    ErrorModalProps,
+    'onConfirm'
+  > | null>();
 
   // Here useRef comes handy for keeping any mutable value around
   const lastSearchedTxRef = useRef<string>('');
@@ -20,19 +31,22 @@ function BtcTransaction() {
       const response = await axios.get<BlockcypherTransaction>(
         `http://localhost:3000/blockchain/transactions/${searchTransaction}`
       );
-      if (response.status === 400) {
-        throw new Error('Bad request.');
-      }
-      if (response.status === 500) {
-        throw new Error('Internal server error');
-      }
       const data: BlockcypherTransaction = await response.data;
 
       setTxData(data);
       lastSearchedTxRef.current = searchTransaction;
-    } catch (error) {
-      console.error(error);
-      alert('Address search failed: ' + (error as Error).message);
+    } catch (err) {
+      console.error(err);
+      setError({
+        title: (axios.isAxiosError(err) && err.response?.statusText) || 'Error',
+        message:
+          axios.isAxiosError(err) && isMappedErrorStatus(err?.response?.status)
+            ? MAPPED_ERROR_MESSAGES[err!.response!.status].message({
+                hashFrom: 'transaction',
+                hash: searchTransaction,
+              })
+            : 'Something went wrong, try again.',
+      });
     }
   };
 
@@ -51,8 +65,18 @@ function BtcTransaction() {
     },
   ];
 
+  const errorHandler = () => {
+    setError(null);
+  };
   return (
     <>
+      {error && (
+        <UiErrorModal
+          onConfirm={errorHandler}
+          title={error.title}
+          message={error.message}
+        />
+      )}
       <h2>Transaction Information</h2>
       <UiInputField
         label={addressInputLabel}
@@ -60,7 +84,7 @@ function BtcTransaction() {
         value={searchTransaction}
         onChange={(e) => setSearchTransaction(e.target.value)}
       />
-      <UiButton text="Search" onClick={handleSearch} />
+      <UiButton onClick={handleSearch}>Search</UiButton>
       {txData && <UiDescriptionList items={items} />}
     </>
   );
